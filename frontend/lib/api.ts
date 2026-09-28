@@ -23,6 +23,31 @@ export async function request<T>(path: string, options?: RequestInit): Promise<T
   return body as T;
 }
 
+export function uploadVideo(body: FormData, onProgress: (percent: number) => void): Promise<Video> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/videos");
+    xhr.upload.onprogress = event => {
+      if (event.lengthComputable) onProgress(Math.min(100, Math.round(event.loaded / event.total * 100)));
+    };
+    xhr.onload = () => {
+      let result: unknown;
+      try { result = JSON.parse(xhr.responseText); } catch { result = null; }
+      const data = result as { message?: string; code?: string; retryable?: boolean } | null;
+      if (xhr.status < 200 || xhr.status >= 300) {
+        reject(new ApiError(data?.message ?? `Upload failed (${xhr.status}). Please try again.`, data?.code ?? null, data?.retryable ?? null));
+      } else if (!result) {
+        reject(new Error("The server returned an unreadable response. Please try again."));
+      } else {
+        resolve(result as Video);
+      }
+    };
+    xhr.onerror = () => reject(new Error("Cannot reach the server. Check your connection and try again shortly."));
+    xhr.onabort = () => reject(new Error("Upload was cancelled."));
+    xhr.send(body);
+  });
+}
+
 export function formatTime(ms: number): string {
   const seconds = Math.floor(ms / 1000);
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}.${String(ms % 1000).padStart(3, "0")}`;

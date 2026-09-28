@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { ApiError, BrandContext, ChatResponse, Comment, displayTime, request, Video } from "@/lib/api";
+import { ApiError, BrandContext, ChatResponse, Comment, displayTime, request, uploadVideo, Video } from "@/lib/api";
 import { CommentComposer } from "@/components/CommentComposer";
 import { CommentFilter, FeedbackPanel, FeedbackTab } from "@/components/FeedbackPanel";
 import { ReviewPlayer, ReviewPlayerHandle } from "@/components/ReviewPlayer";
@@ -14,6 +14,7 @@ export default function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [showUpload, setShowUpload] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [currentMs, setCurrentMs] = useState(0);
@@ -95,10 +96,10 @@ export default function Home() {
     if (!file || busy) return;
     setError("");
     if (file.size > 100 * 1024 * 1024) { setError("The video must be 100 MiB or smaller."); return; }
-    setBusy(true);
+    setBusy(true); setUploadProgress(0);
     const body = new FormData(); body.append("file", file); body.append("brand_context", context);
     try {
-      const saved = await request<Video>("/api/videos", { method: "POST", body });
+      const saved = await uploadVideo(body, setUploadProgress);
       activate(saved);
       window.history.pushState({}, "", `/?video=${saved.id}`);
       setFile(null);
@@ -211,7 +212,14 @@ export default function Home() {
     }
     return null;
   })();
-  const uploadForm = <form onSubmit={upload} className="upload-form"><label>Video file<input ref={fileInput} type="file" accept=".mp4,video/mp4" disabled={busy || loading} onChange={event => setFile(event.target.files?.[0] ?? null)} /></label><label>Review context<select value={context} disabled={busy || loading} onChange={event => setContext(event.target.value as BrandContext)}><option value="NONE">General</option><option value="MRQ">MRQ</option></select></label><button type="submit" disabled={!file || busy || loading}>{busy ? "Uploading & validating…" : "Upload video"}</button><p className="upload-note">MP4 · H.264 · AAC or silent · up to 100 MiB / 5 minutes. Existing reviews keep their saved context.</p></form>;
+  const uploadForm = <form onSubmit={upload} className="upload-form">
+    <label>Video file<input ref={fileInput} type="file" accept=".mp4,video/mp4" disabled={busy || loading} onChange={event => setFile(event.target.files?.[0] ?? null)} /></label>
+    <label>Review context<select value={context} disabled={busy || loading} onChange={event => setContext(event.target.value as BrandContext)}><option value="NONE">General</option><option value="MRQ">MRQ</option></select></label>
+    <button type="submit" disabled={!file || busy || loading}>{busy ? uploadProgress < 100 ? `Uploading ${uploadProgress}%` : "Validating video…" : "Upload video"}</button>
+    {busy && <div className="upload-progress" role="progressbar" aria-label="Video upload progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={uploadProgress}><span style={{ width: `${uploadProgress}%` }} /></div>}
+    {busy && <p className="upload-status" role="status">{uploadProgress < 100 ? "Sending video from your device…" : "Upload sent. Waiting for server validation…"}</p>}
+    <p className="upload-note">MP4 · H.264 · AAC or silent · up to 100 MiB / 5 minutes. Existing reviews keep their saved context.</p>
+  </form>;
 
   return <main className="app-shell">
     <header className="app-header"><div className="header-title"><span className="app-brand">FOXELLI <span>/</span> VIDEO REVIEW</span>{video ? <><h1 title={video.original_filename}>{video.original_filename}</h1><div className="header-meta"><span>{video.brand_context === "MRQ" ? "MRQ" : "General"}</span><span>·</span><span>{displayTime(video.duration_ms)}</span><span>·</span><span className={`status-text status-${video.ai_status.toLowerCase()}`}>{video.ai_status === "PROCESSING" ? "Preparing for AI review…" : video.ai_status === "READY" ? "Ready for AI review" : "AI preparation needs attention"}</span></div></> : <h1>Video review</h1>}</div><div className="header-actions">{video && <><button type="button" className="secondary-button" onClick={() => { if (!showUpload) setContext("NONE"); setShowUpload(value => !value); }}>{showUpload ? "Close upload" : "Upload another video"}</button><button type="button" className="primary-button" disabled={video.ai_status !== "READY" || chatBusy} onClick={() => void sendChat(FIRST_PASS_REQUEST, false)}>{chatBusy ? "Reviewing…" : "Review full video"}</button></>}</div></header>

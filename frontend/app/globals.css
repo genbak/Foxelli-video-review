@@ -28,6 +28,9 @@ h1, h2, p { margin: 0; }
 .upload-form input[type=file], .upload-form select { width: 100%; min-height: 38px; border: 1px solid var(--line); border-radius: 6px; color: var(--text); background: #24262b; padding: 6px; }
 .upload-form input::file-selector-button { background: #373c46; border: 0; color: var(--text); padding: 5px 9px; margin-right: 8px; border-radius: 4px; cursor: pointer; }
 .upload-form .upload-note { flex: 1 0 100%; font-size: 11px; }
+.upload-progress { flex: 1 0 100%; height: 7px; overflow: hidden; border-radius: 7px; background: #373c46; }
+.upload-progress span { display: block; height: 100%; background: var(--blue-strong); transition: width 0.15s ease; }
+.upload-form .upload-status { flex: 1 0 100%; margin-top: -6px; font-size: 12px; }
 .status-alert { background: #3b2b2b; color: #ffdddd; padding: 9px 20px; border-bottom: 1px solid #654343; display: flex; justify-content: space-between; align-items: center; gap: 16px; font-size: 13px; }
 .status-alert button { background: #624040; border-color: #8b5555; }.status-inline { margin: 8px 20px; }
 .error { color: #ffd2cb; font-size: 12px; margin-top: 8px; }
