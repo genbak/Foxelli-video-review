@@ -1,0 +1,51 @@
+# Private client material
+/references/private/
+/evaluation/
+/evaluations/
+/artifacts/
+*.jsonl
+*.bundle
+/backend/reference/*.pdf
+*.mp4
+*.mov
+*.webm
+*.zip
+
+# Secrets and hosted access credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.htpasswd
+*.htpasswd
+/secrets/
+
+# Runtime data and temporary artifacts
+/uploads/
+/data/
+/tmp/
+*.log
+
+# JavaScript / Next.js
+node_modules/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local editor and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

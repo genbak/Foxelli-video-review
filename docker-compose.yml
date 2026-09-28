@@ -1,0 +1,90 @@
+name: foxelli-video-review
+
+services:
+  postgres:
+    image: postgres:17.9-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-foxelli}
+      POSTGRES_USER: ${POSTGRES_USER:-foxelli}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Copy .env.example to .env and set POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7.4.8-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-foxelli}
+      POSTGRES_USER: ${POSTGRES_USER:-foxelli}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_HOST: postgres
+      REDIS_URL: redis://redis:6379/0
+      UPLOAD_DIR: /data
+      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-104857600}
+      MAX_DURATION_MS: ${MAX_DURATION_MS:-300000}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:?Set GEMINI_API_KEY in the ignored .env file}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-flash}
+      GEMINI_PREPARE_TIMEOUT_SECONDS: ${GEMINI_PREPARE_TIMEOUT_SECONDS:-300}
+      GEMINI_GENERATE_TIMEOUT_SECONDS: ${GEMINI_GENERATE_TIMEOUT_SECONDS:-120}
+      GEMINI_GENERATE_MAX_OUTPUT_TOKENS: ${GEMINI_GENERATE_MAX_OUTPUT_TOKENS:-8192}
+      MRQ_BRANDBOOK_PATH: /app/reference/mrq.pdf
+    volumes:
+      - uploads:/data
+      - ./references/private/brand/MRQ-brandbook-July-2024.pdf:/app/reference/mrq.pdf:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=8)"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
+
+  frontend:
+    build: ./frontend
+    environment:
+      NEXT_TELEMETRY_DISABLED: "1"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  nginx:
+    image: nginx:1.28.3-alpine
+    ports:
+      - "127.0.0.1:${APP_PORT:-8080}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - uploads:/data:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/api/health"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  postgres_data:
+  uploads:
